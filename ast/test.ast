@@ -1,0 +1,47 @@
+entry [nevim
+	asd="dfg" sdff="xfvgdf" fdgd="dfgd"
+		nevim
+	. ?
+		err ! print="ahoj"
+	;;
+
+{
+	"entry": Head {
+		 name: "entry",
+		 parameters: [
+			Array("nevim")
+		], 
+		nodes: [
+			ArgsCondition(ArgsCon {
+				params: {
+					"sdff": "xfvgdf", 
+					"fdgd": "dfgd", 
+					"asd": "dfg"
+				}, 
+				nodes: [
+					Expect(Node { 
+						kind: Text("nevim"), 
+						arguments: {}, 
+						nodes: [] 
+					})
+				] 
+			}), 
+			Maybe(Node { 
+				kind: Dot, 
+				arguments: {}, 
+				nodes: [
+					Command(Node { 
+						kind: Text("err"), 
+						arguments: {"print": "ahoj"}, 
+						nodes: [] 
+					})
+				] 
+			}), 
+			Expect(Node { 
+				kind: Semicolon, 
+				arguments: {}, 
+				nodes: [] 
+			})
+		] 
+	}
+}

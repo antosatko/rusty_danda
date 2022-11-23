@@ -9,7 +9,7 @@ code_block [lines
 	loop ? set="lines"
 	while ? set="lines"
 	do ? set="lines"
-	return ? set="lines"
+	return ? set="lines" lock="lines"
 	iterable="true"
 		break ? set="lines"
 		continue ? set="lines"
@@ -74,10 +74,25 @@ setting_operator result
 
 value [expression
 	variable ? set="expression" back="0"
-	operator ? set="expression" back="1";
+	operator ? set="expression" back="1"
+	"'number" ? set="expression" back="1";
 
 let identifier type val
 	"let"
+	identifier set="identifier"
+	; ? end="true"
+	: ?
+		_type set="type"
+	; ? end="true"
+	= ?
+		value ? breakdel=";" set="value" end="true"
+		if ? return="true" set="value" break="true"
+		loop ? return="true" set="value" break="true"
+		err !
+	;;
+
+obj identifier type val
+	"obj"
 	identifier set="identifier"
 	; ? end="true"
 	: ?
@@ -94,8 +109,14 @@ const
 	"const"
 	typed_identifier
 	=
-		value knownAtCompTime="true"
+		value
 	;;
+
+type identifier type
+	"type"
+	identifier set="identifier"
+	=
+	_type set="type";;
 
 switch
 	"switch"
@@ -153,7 +174,7 @@ enum identifier [keys
 	{
 	identifier set="keys"
 	= ?
-		value knownAtCompTime="true" set="keys"
+		value set="keys"
 	, ? back="2"
 	};
 
@@ -191,3 +212,13 @@ use [path
 		identifier ? set="path" back="1"
 		* ? set="path"
 	;;
+
+entry main [nodes
+	use ? set="nodes" back="0"
+	struct ? set="nodes" back="1"
+	function ? set="nodes" back="2"
+	enum ? set="nodes" back="3"
+	trait ? set="nodes" back="4"
+	const ? set="nodes" back="5"
+	"main" ? 
+		function set="main" back="7";
