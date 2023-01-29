@@ -33,11 +33,12 @@ pub mod ast_parser {
         if tokens.len() == *idx {
             return None;
         }
-        let name = if let Tokens::Text(txt) = &tokens[*idx] {
+        let name = loop {
+            if let Tokens::Text(txt) = &tokens[*idx] {
+                *idx += 1;
+                break txt.to_string()
+        }
             *idx += 1;
-            txt.to_string()
-        } else {
-            return None;
         };
         let mut parameters = vec![];
         while tokens[*idx] != Tokens::Tab {
@@ -130,9 +131,6 @@ pub mod ast_parser {
         }
         count
     }
-    struct Output {
-        
-    }
     #[derive(Debug)]
     pub struct Head {
         pub name: String,
@@ -159,8 +157,8 @@ pub mod ast_parser {
     }
     #[derive(Debug)]
     pub struct ArgsCon {
-        params: NodeParameters,
-        nodes: Vec<NodeType>,
+        pub params: NodeParameters,
+        pub nodes: Vec<NodeType>,
     }
 }
 

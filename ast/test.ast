@@ -1,47 +1,26 @@
 entry [nevim
-	asd="dfg" sdff="xfvgdf" fdgd="dfgd"
-		nevim
-	. ?
-		err ! print="ahoj"
+	{
+	let ? set="nevim" back="0"
+	}
+	"'any" ? err="mas tu neco navic";
+
+wrongThing
+	"not even a valid text";
+
+let name type value
+	"let" harderr="true"
+	"'text" set="name"
+	type ? set="type"
+	= ?
+		"'number" set="value"
 	;;
 
-{
-	"entry": Head {
-		 name: "entry",
-		 parameters: [
-			Array("nevim")
-		], 
-		nodes: [
-			ArgsCondition(ArgsCon {
-				params: {
-					"sdff": "xfvgdf", 
-					"fdgd": "dfgd", 
-					"asd": "dfg"
-				}, 
-				nodes: [
-					Expect(Node { 
-						kind: Text("nevim"), 
-						arguments: {}, 
-						nodes: [] 
-					})
-				] 
-			}), 
-			Maybe(Node { 
-				kind: Dot, 
-				arguments: {}, 
-				nodes: [
-					Command(Node { 
-						kind: Text("err"), 
-						arguments: {"print": "ahoj"}, 
-						nodes: [] 
-					})
-				] 
-			}), 
-			Expect(Node { 
-				kind: Semicolon, 
-				arguments: {}, 
-				nodes: [] 
-			})
-		] 
-	}
-}
+value value
+	"'string" ? set="value" end="true"
+	"'number" ? set="value" end="true"
+	"undefined" ? set="value" end="true"
+	"'any" err="zadna shoda";
+
+type type
+	: harderr="true"
+	"'text" set="type";

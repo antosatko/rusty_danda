@@ -15,11 +15,12 @@ code_block [lines
 		continue ? set="lines"
 	use ? set="lines"
 	lib ? set="lines"
-	value ? set="lines" back="13"
+	} ? stop="block" end="true"
+	value ? set="lines" back="14"
 	err !;
 
 _type parent [children
-	identifier set="parent"
+	"'text" set="parent"
 	< ?
 		_type set="children"
 		, ?
@@ -27,7 +28,7 @@ _type parent [children
 	>;
 
 typed_identifier identifier type
-	identifier set="identifier"
+	"'text" set="identifier"
 	:
 	type set="type";
 
@@ -39,11 +40,12 @@ index
 arguments [args
 	(
 	variable ? set="args"
-	, ? back="1"
+	, ?
+		variable set="args" back="1"
 	);
 
 variable identifier [children
-	identifier set="identifier"
+	"'text" set="identifier"
 	arguments ? set="children" back="0"
 	index ? set="children" back="1"
 	. ?
@@ -79,7 +81,7 @@ value [expression
 
 let identifier type val
 	"let"
-	identifier set="identifier"
+	"'text" set="identifier"
 	; ? end="true"
 	: ?
 		_type set="type"
@@ -93,7 +95,7 @@ let identifier type val
 
 obj identifier type val
 	"obj"
-	identifier set="identifier"
+	"'text" set="identifier"
 	; ? end="true"
 	: ?
 		_type set="type"
@@ -114,7 +116,7 @@ const
 
 type identifier type
 	"type"
-	identifier set="identifier"
+	"'text" set="identifier"
 	=
 	_type set="type";;
 
@@ -139,7 +141,7 @@ if [conditions [code_blocks
 
 fun identifier [args code
 	"fun"
-	identifier set="identifier"
+	"'text" set="identifier"
 	(
 	typed_identifier ? set="args"
 		, ? back="1"
@@ -150,18 +152,18 @@ fun identifier [args code
 
 struct identifier [keys [methods [traits
 	"struct"
-	identifier set="identifier"
+	"'text" set="identifier"
 	{
 	fun ? set="methods" back="0"
 	typed_identifier ? set="keys"
 		, ? back="2"
 	impl ?
-		identifier set="traits" back="3"
+		"'text" set="traits" back="3"
 	};
 
 trait identifier [keys [methods
 	"trait"
-	identifier set="identifier"
+	"'text" set="identifier"
 	{
 	fun ? set="methods" back="0"
 	typed_identifier ? set="keys"
@@ -170,12 +172,28 @@ trait identifier [keys [methods
 
 enum identifier [keys
 	"enum"
-	identifier set="identifier"
+	"'text" set="identifier"
 	{
-	identifier set="keys"
+	"'text" set="keys"
 	= ?
 		value set="keys"
 	, ? back="2"
+	};
+
+for iterator code
+	"for"
+	value set="value" breakex="{"
+	code_block set="code" iterable="true";
+
+labeled_code label code
+	"'text" set="label"
+	code_block set="code";
+
+foreach iterator [code
+	"foreach"
+	value set="iterator" breakdel="{"
+	labeled_code ? set="code"
+		, ? back="1"
 	};
 
 loop code_block
@@ -195,19 +213,24 @@ do condition code_block
 
 return value
 	"return"
-	value ? breakdel=";" set="value";
+	value ? breakex=";" set="value"
+	; ?
+	pass="block";
 
 break value
 	"break"
-	value ? breakdel=";" set="value";
+	value ? breakex=";" set="value"
+	; ?
+	pass="block";
 
 continue
 	"continue"
-	;;
+	; ?
+	pass="block";
 
 use [path
 	"use"
-	identifier set="path"
+	"'text" set="path"
 	. ?
 		identifier ? set="path" back="1"
 		* ? set="path"
@@ -220,5 +243,5 @@ entry main [nodes
 	enum ? set="nodes" back="3"
 	trait ? set="nodes" back="4"
 	const ? set="nodes" back="5"
-	"main" ? 
+	"main" ?
 		function set="main" back="7";
