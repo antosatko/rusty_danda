@@ -4,12 +4,13 @@ pub mod tokenizer {
         refactorer::refactor,
     };
     const RESERVED_CHARS: &str = " +-*/=%;:,.({<[]>})&|!?\"'\\";
-    pub fn parse(
+    pub fn tokenize(
         file: String,
         format: bool,
     ) -> (Vec<Tokens>, Vec<(usize, usize)>, Vec<parse_err::Errors>) {
-        let mut tokens: Vec<Tokens> = vec![];
-        let mut text_pos: Vec<(usize, usize)> = vec![(0, 0)];
+        let mut tokens: Vec<Tokens> = Vec::with_capacity(file.len() / 6);
+        let mut text_pos: Vec<(usize, usize)> = Vec::with_capacity(file.len() / 6);
+        text_pos.push((0,0));
         let mut errors: Vec<parse_err::Errors> = vec![];
 
         let mut i = 0;

@@ -1,4 +1,4 @@
-use std::{env, fs::File, io::Read};
+use std::{env, fs::File, io::Read, hint::black_box, time::{Duration, SystemTime}};
 use ast_parser::ast_parser::generate_ast;
 use tree_walker::tree_walker::generate_tree;
 //use runtime::*;
@@ -39,16 +39,23 @@ fn main() {
                 File::open(file).expect(&format!("File not found. ({})", path).to_owned());
             file.read_to_string(&mut string).expect("neco se pokazilo");
             use lexer::tokenizer::*;
-            let ast = if let Some(ast) = generate_ast("ast/json.ast") {
+            let ast = if let Some(ast) = generate_ast("ast/test.ast") {
                 ast
             }else {
                 panic!();
             };
             println!("AST loaded.");
-            let tokens = parse(string, true);
+            let time = SystemTime::now();
+            let tokens = tokenize(string, true);
             println!("Lexing complete.");
-            let parsed_tree = generate_tree(&tokens.0, &ast, true);
+            println!("time: {}", SystemTime::now().duration_since(time).unwrap().as_millis());
+            let parsed_tree = generate_tree(&tokens.0, &ast, true   );
             println!("Parsed.");
+            /*use std::io::*;
+            let mut input = String::new();
+            stdin().read_line(&mut input).expect("error: unable to read user input");
+            println!("{}",input);*/
+            black_box(parsed_tree);
         }
         "tokenize" => {
             let file = match args.nth(0) {
@@ -61,7 +68,7 @@ fn main() {
                 File::open(file).expect(&format!("File not found. ({})", path).to_owned());
             file.read_to_string(&mut string).expect("neco se pokazilo");
             use lexer::tokenizer::*;
-            let tokens = parse(string, true);
+            let tokens = tokenize(string, true);
             println!("{:?}", tokens.0);
         }
         "astTest" => {
@@ -82,11 +89,18 @@ fn main() {
             }
         }
         _ => {
-            println!("{:?} == {:?} = {:?}", Some(56), None::<i32>, None == Some(56));
+            /*println!("{:?} == {:?} = {:?}", Some(56), None::<i32>, None == Some(56));
             println!("{:?} == {:?} = {:?}", Some(56), Some(92), Some(56) == Some(92));
             println!("{:?} == {:?} = {:?}", Some(56), Some(56), Some(56) == Some(56));
             println!("Unknown command: {}", cmd);
-            println!("Try help.");
+            println!("Try help.");*/
+            let mut vector = Vec::with_capacity(5000000);
+            let time = SystemTime::now();
+            for _ in 0..5000000 {
+                vector.push(String::from("5u128"));
+            }
+            println!("time: {}", SystemTime::now().duration_since(time).unwrap().as_millis());
+            black_box(vector);
         }
     }
 }

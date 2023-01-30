@@ -128,7 +128,7 @@ pub mod tree_walker {
                 } else {
                     //println!("Warpin away!\n\n\n");
                     *idx += 1;
-                    return Ok(Some(($num - node_idx-1, $freeze)));
+                    return Ok(Some(($num - node_idx - 1, $freeze)));
                 }
             };
         }
