@@ -1,4 +1,6 @@
 pub mod refactorer {
+    use std::{time::SystemTime, collections::btree_map::Range};
+
     use crate::lexer::{
         tokenizer::{deparse_token, Operators, Tokens},
     };
@@ -6,63 +8,35 @@ pub mod refactorer {
     use super::parse_err::Errors;
     pub fn refactor(
         mut tokens: Vec<Tokens>,
-        lines: &mut Vec<(usize, usize)>,
+        lines: Vec<(usize, usize)>,
         errors: &mut Vec<Errors>,
-    ) -> Result<Vec<Tokens>, LexingErr> {
+    ) -> Result<(Vec<Tokens>, Vec<(usize, usize)>), LexingErr> {
         let mut i = 0;
+        let start = SystemTime::now();
+        let before = tokens.len();
         while i < tokens.len() {
-            i += process_token(&mut tokens, i, lines, errors);
+            if i == tokens.len() / 2 {
+                println!("refactor half: {}", SystemTime::now().duration_since(start).unwrap().as_millis());
+            }
+            i += process_token(&mut tokens, i, &lines, errors);
         }
-        Ok(tokens)
+        tokens.push(Tokens::EndOfFile);
+        println!("refactor: {}", SystemTime::now().duration_since(start).unwrap().as_millis());
+        println!("tokens before: {before}, iterations: {i}, now: {}", before - tokens.iter().filter(|x| **x == Tokens::Deleted).count());
+        Ok(clear(&tokens, &lines))
     }
     fn process_token(
         tokens: &mut Vec<Tokens>,
         idx: usize,
-        lines: &mut Vec<(usize, usize)>,
+        lines: &Vec<(usize, usize)>,
         errors: &mut Vec<Errors>,
     ) -> usize {
         match &tokens[idx] {
-            Tokens::DoubleQuotes => {
-                let mut i = idx + 1;
-                let mut res = String::new();
-                while tokens[i] != Tokens::DoubleQuotes {
-                    res.push_str(&deparse_token(&tokens[i]));
-                    i += 1;
-                    if i == tokens.len() {
-                        // syntax err: end of string never found
-                        tokens.splice(idx + 1.., []);
-                        lines.splice(idx + 1.., []);
-                        tokens[idx] = Tokens::String(res);
-                        return 1;
-                    }
-                }
-                tokens.splice(idx + 1..i + 1, []);
-                lines.splice(idx + 1..i + 1, []);
-                tokens[idx] = Tokens::String(res);
-            }
-            Tokens::Space => {
-                tokens.remove(idx);
-                lines.remove(idx);
-                return 0;
-            }
-            Tokens::Colon => {
-                if let Tokens::Colon = tokens[idx + 1] {
-                    tokens[idx] = Tokens::DoubleColon;
-                    tokens.remove(idx + 1);
-                    lines.remove(idx + 1);
-                }
-            }
-            Tokens::Semicolon => {
-                if tokens.len() != idx + 1 {
-                    while let Tokens::Semicolon = tokens[idx + 1] {
-                        tokens.remove(idx + 1);
-                        lines.remove(idx + 1);
-                    }
-                }
-            }
             Tokens::Text(txt) => {
-                let bytes = txt.as_bytes();
-                if let Some(first) = bytes.get(0) {
+                let mut chars = txt.chars();
+                let first = chars.next();
+                let last = if let Some(last) = chars.last() {last} else {first.unwrap()};
+                if let Some(first) = first {
                     if first.is_ascii_digit() {
                         // float
                         if let Tokens::Dot = &tokens[idx + 1] {
@@ -74,12 +48,13 @@ pub mod refactorer {
                                 return 1;
                             };
                             if let Tokens::Text(txt2) = &tokens[idx + 2] {
-                                if let Ok(num2) = txt2.parse::<usize>() {
+                                let mut float = String::from("0.");
+                                float.push_str(txt2);
+                                if let Ok(num2) = float.parse::<f64>() {
                                     tokens[idx] = Tokens::Number(first_num, num2, 'f');
-                                    tokens.remove(idx + 1);
-                                    tokens.remove(idx + 1);
-                                    lines.remove(idx + 1);
-                                    lines.remove(idx + 1);
+                                    remove(tokens, idx + 1);
+                                    remove(tokens, idx + 2);
+                                    return 2;
                                 } else {
                                     // syntax err: incorrect number
                                     let mut res = txt.to_string();
@@ -93,9 +68,9 @@ pub mod refactorer {
                             }
                         // int
                         } else {
-                            if bytes[bytes.len() - 1].is_ascii_digit() {
+                            if last.is_ascii_digit() {
                                 if let Ok(num) = txt.parse::<usize>() {
-                                    tokens[idx] = Tokens::Number(num, 0, 'i')
+                                    tokens[idx] = Tokens::Number(num, 0f64, 'i')
                                 } else {
                                     errors.push(Errors::InvalidNumber(lines[idx], txt.to_string()));
                                     // syntax err: incorrect number
@@ -103,7 +78,7 @@ pub mod refactorer {
                             } else {
                                 if let Ok(num) = txt[..txt.len() - 1].parse::<usize>() {
                                     tokens[idx] =
-                                        Tokens::Number(num, 0, bytes[bytes.len() - 1] as char)
+                                        Tokens::Number(num, 0f64, last)
                                 } else {
                                     errors.push(Errors::InvalidNumber(lines[idx], txt.to_string()));
                                     // syntax err: incorrect number
@@ -118,79 +93,112 @@ pub mod refactorer {
                         return 1;
                     }
                 }
-                lines.remove(idx);
-                tokens.remove(idx);
-                return 0;
+                // is whitespace
+                remove(tokens, idx);
+                return 1;
+            }
+            Tokens::Whitespace(_) => {
+                remove(tokens, idx);
+                return 1;
+            }
+            Tokens::DoubleQuotes => {
+                let mut i = idx + 1;
+                let mut res = String::new();
+                while tokens[i] != Tokens::DoubleQuotes {
+                    res.push_str(&deparse_token(&tokens[i]));
+                    i += 1;
+                    if i == tokens.len() {
+                        // syntax err: end of string never found
+                        remove_range(tokens, idx + 1, tokens.len());
+                        tokens[idx] = Tokens::String(res);
+                        return 1;
+                    }
+                }
+                remove_range(tokens, idx + 1, i + 1);
+                tokens[idx] = Tokens::String(res);
+            }
+            Tokens::Space => {
+                remove(tokens, idx);
+            }
+            Tokens::Colon => {
+                if !not_end(idx, &tokens) {
+                    return 1;
+                }
+                if let Tokens::Colon = tokens[idx + 1] {
+                    tokens[idx] = Tokens::DoubleColon;
+                    remove(tokens, idx + 1);
+                }
+                return 1;
+            }
+            Tokens::Semicolon => {
+                if tokens.len() != idx + 1 {
+                    while let Tokens::Semicolon = tokens[idx + 1] {
+                        remove(tokens, idx + 1);
+                    }
+                }
             }
             Tokens::Operator(op) => match op {
                 Operators::Add => {
                     if let Tokens::Operator(Operators::Equal) = tokens[idx + 1] {
                         tokens[idx] = Tokens::Operator(Operators::AddEq);
-                        tokens.remove(idx + 1);
-                        lines.remove(idx + 1);
+                        remove(tokens, idx + 1);
                     }
                 }
                 Operators::Sub => {
                     if let Tokens::Operator(Operators::Equal) = tokens[idx + 1] {
                         tokens[idx] = Tokens::Operator(Operators::SubEq);
-                        tokens.remove(idx + 1);
-                        lines.remove(idx + 1);
+                        remove(tokens, idx + 1);
                     }
                 }
                 Operators::Mul => {
                     if let Tokens::Operator(Operators::Equal) = tokens[idx + 1] {
                         tokens[idx] = Tokens::Operator(Operators::MulEq);
-                        tokens.remove(idx + 1);
-                        lines.remove(idx + 1);
+                        remove(tokens, idx + 1);
                     }
                 }
                 Operators::Div => {
                     if let Tokens::Operator(Operators::Equal) = tokens[idx + 1] {
                         tokens[idx] = Tokens::Operator(Operators::DivEq);
-                        tokens.remove(idx + 1);
-                        lines.remove(idx + 1);
+                        remove(tokens, idx + 1);
                     } else if let Tokens::Operator(Operators::Div) = tokens[idx + 1] {
+                        let mut i = idx + 1;
                         loop {
-                            tokens.remove(idx);
-                            lines.remove(idx);
-                            if let Tokens::Text(str) = &tokens[idx] {
+                            if let Tokens::Whitespace(str) = &tokens[i] {
                                 if str == "\n" {
                                     break;
                                 }
                             }
+                            remove(tokens, i);
+                            i += 1;
                         }
-                        tokens.remove(idx);
-                        lines.remove(idx);
-                        return 0;
+                        remove(tokens, idx);
+                        return i - idx;
                     } else if let Tokens::Operator(Operators::Mul) = tokens[idx + 1] {
+                        let mut i = idx;
                         loop {
-                            tokens.remove(idx);
-                            lines.remove(idx);
-                            if let Tokens::Operator(Operators::Mul) = &tokens[idx] {
-                                if let Tokens::Operator(Operators::Div) = &tokens[idx + 1] {
+                            if let Tokens::Operator(Operators::Mul) = &tokens[i] {
+                                if let Tokens::Operator(Operators::Div) = &tokens[i + 1] {
                                     break;
                                 }
                             }
+                            remove(tokens, i);
+                            i += 1;
                         }
-                        tokens.remove(idx);
-                        lines.remove(idx);
-                        tokens.remove(idx);
-                        lines.remove(idx);
-                        return 0;
+                        remove(tokens, i);
+                        remove(tokens, i + 1);
+                        return i - idx + 2;
                     }
                 }
                 Operators::Not => {
                     if let Tokens::Operator(Operators::Equal) = tokens[idx + 1] {
                         tokens[idx] = Tokens::Operator(Operators::NotEqual);
-                        tokens.remove(idx + 1);
-                        lines.remove(idx + 1);
+                        remove(tokens, idx + 1);
                     }
                 }
                 Operators::Equal => {
                     if let Tokens::Operator(Operators::Equal) = tokens[idx + 1] {
                         tokens[idx] = Tokens::Operator(Operators::DoubleEq);
-                        tokens.remove(idx + 1);
-                        lines.remove(idx + 1);
+                        remove(tokens, idx + 1);
                     }
                 }
                 _ => {}
@@ -206,39 +214,56 @@ pub mod refactorer {
                                 tokens[idx] = Tokens::Operator(Operators::MoreEq)
                             }
                         }
-                        tokens.remove(idx + 1);
-                        lines.remove(idx + 1);
+                        remove(tokens, idx + 1);
                     }
                 }
             }
             Tokens::Pipe => {
                 if let Tokens::Pipe = tokens[idx + 1] {
                     tokens[idx] = Tokens::Operator(Operators::Or);
-                    tokens.remove(idx + 1);
-                    lines.remove(idx + 1);
+                    remove(tokens, idx + 1);
                 }
-                println!("{:?}", tokens[idx]);
             }
             Tokens::Ampersant => {
                 if let Tokens::Ampersant = tokens[idx + 1] {
                     tokens[idx] = Tokens::Operator(Operators::And);
-                    tokens.remove(idx + 1);
-                    lines.remove(idx + 1);
+                    remove(tokens, idx + 1);
                 }
             }
-            _ => {}
+            _ => {
+            }
         }
         1
+    }
+    fn clear(tokens: &Vec<Tokens>, lines: &Vec<(usize, usize)>) -> (Vec<Tokens>, Vec<(usize, usize)>) {
+        let mut result = (Vec::new(), Vec::new());
+        for (i, tok) in tokens.iter().enumerate() {
+            if *tok != Tokens::Deleted {
+                result.0.push((*tok).clone());
+                result.1.push(lines[i].clone());
+            }
+        }
+        result
+    }
+    fn not_end(idx: usize, tokens: &Vec<Tokens>) -> bool {
+        idx < tokens.len()
+    }
+    fn remove(tokens: &mut Vec<Tokens>, idx: usize) -> usize {
+        tokens[idx] = Tokens::Deleted;
+        0
+    }
+    fn remove_range(tokens: &mut Vec<Tokens>, start: usize, end: usize) -> usize {
+        for i in start..end {
+            tokens[i] = Tokens::Deleted;
+        }
+        0
     }
     pub enum LexingErr {}
 }
 
 pub mod parse_err {
-    use crate::lexer::tokenizer::Tokens;
-
+    #[derive(Debug)]
     pub enum Errors {
-        // (line, column) token
-        UnexpectedToken((usize, usize), Tokens),
         // (line, column) number
         InvalidNumber((usize, usize), String),
     }

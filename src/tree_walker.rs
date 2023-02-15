@@ -2,8 +2,8 @@ pub mod tree_walker {
     use std::collections::HashMap;
 
     use crate::ast_parser::ast_parser::{self, *};
-    use crate::lexer::tokenizer::*;
-    pub fn generate_tree(tokens: &Vec<Tokens>, syntax: &Tree, print: bool) {
+    use crate::lexer::tokenizer::{*, self};
+    pub fn generate_tree(tokens: &Vec<Tokens>, syntax: &Tree, lines: &Vec<(usize, usize)>) -> Option<Node> {
         let mut idx = 0;
         let product = parse_node(
             &tokens,
@@ -12,42 +12,29 @@ pub mod tree_walker {
             &mut idx,
             &String::from("entry"),
         );
-        if print {
-            match product {
-                Ok(prd) => {
-                    for nod in prd.nodes {
-                        println!("{:?}", nod.0);
-                        match nod.1 {
-                            NodeType::Array(arr) => {
-                                for arg in arr {
-                                    println!("{arg:?}");
-                                }
-                            }
-                            NodeType::Value(val) => {
-                                println!("{val:?}");
-                            }
-                        }
-                    }
-                }
-                Err(err) => {
-                    println!("{err:?}")
-                }
+        match product {
+            Ok(prd) => {
+                Some(prd)
+            }
+            Err(err) => {
+                println!("{err:?}\nOriginated at line: {}, column: {}", lines[idx].1 + 1, lines[idx].0 + 1);
+                None
             }
         }
     }
-    fn prep_nodes(syntax: &Tree, id: &String) -> Option<HashMap<String, NodeType>> {
+    fn prep_nodes(syntax: &Tree, id: &String) -> Option<HashMap<String, ArgNodeType>> {
         let mut map = HashMap::new();
         match &syntax.get(id) {
             Some(node) => {
                 for param in &node.parameters {
                     match param {
                         HeadParam::Array(arr) => {
-                            map.insert(arr.into(), NodeType::Array(vec![]));
+                            map.insert(arr.into(), ArgNodeType::Array(vec![]));
                         }
                         HeadParam::Value(val) => {
                             map.insert(
                                 val.into(),
-                                NodeType::Value(Node {
+                                ArgNodeType::Value(Node {
                                     name: Tokens::Text(String::from("'none")),
                                     data: None,
                                     nodes: HashMap::new(),
@@ -74,7 +61,7 @@ pub mod tree_walker {
         let mut result = Node {
             name: Tokens::Text(id.into()),
             data: None,
-            nodes: prep_nodes(&syntax, &id).unwrap(),
+            nodes: prep_nodes(&syntax, &id).expect(&format!("{id}")),
         };
         match parse_scope(
             &tokens,
@@ -85,7 +72,7 @@ pub mod tree_walker {
             &mut result.nodes,
             &mut false,
         ) {
-            Ok(ok) => {
+            Ok(_) => {
                 return Ok(result);
             }
             Err(err) => {
@@ -100,7 +87,7 @@ pub mod tree_walker {
         params: &NodeParameters,
         idx: &mut usize,
         nodes: &Vec<ast_parser::NodeType>,
-        data: &mut HashMap<String, super::tree_walker::NodeType>,
+        data: &mut HashMap<String, super::tree_walker::ArgNodeType>,
         harderr: &mut bool,
     ) -> Result<Option<(usize, ReturnActions)>, (Err, bool)> {
         let mut node_idx = 0;
@@ -137,6 +124,9 @@ pub mod tree_walker {
                 if let Some(arg) = $args.get("print") {
                     println!("{:?}", arg);
                 }
+                if let Some(_) = $args.get("debug") {
+                    println!("{:?}", tokens[*idx]);
+                }
                 if let Some(_) = $args.get("peek") {
                     advance_tok = false;
                 }
@@ -150,15 +140,37 @@ pub mod tree_walker {
                         }
                     }
                 }
+                if let Some(num) = $args.get("#advance") {
+                    match num.parse::<usize>() {
+                        Ok(num) => {
+                            *idx -= num;
+                        }
+                        _ => {
+                            *idx -= 1;
+                        }
+                    }
+                }
                 if let Some(arg) = $args.get("harderr") {
                     *harderr = false;
                     if arg == "true" {
                         *harderr = true;
                     }
                 }
-                if let Some(arg) = $args.get("set") {
+                if let Some(arg) = $args.get("notempty") {
+                    if let TokenOrNode::Node(ref nodede) = $token {
+                        if let Some(ArgNodeType::Array(arr)) = nodede.nodes.get(arg) {
+                            if arr.len() == 0 {
+                                Error!(Err::Expected($node.clone(), tokens[*idx].clone()), true);
+                            }
+                        }
+                    }
+                }
+                else if let Some(arg) = $args.get("set") {
                     set($token, $node, &mut data.get_mut(arg.into()).unwrap());
                     //println!("{:?}", data);
+                }
+                if let Some(ident) = $args.get("data") {
+                    println!("{:?}", data.get(ident).expect("wrong identifier for data"));
                 }
                 if let Some(arg) = $args.get("back") {
                     let num = arg.parse::<usize>().unwrap();
@@ -168,7 +180,7 @@ pub mod tree_walker {
                     if str == "true" {
                         *idx += 1;
                     }
-                    return Ok(Some((0, ReturnActions::Chain)));
+                    break;
                 }
                 if let Some(arg) = $args.get("pass") {
                     Error!(Err::Pass(arg.into()), false);
@@ -213,7 +225,7 @@ pub mod tree_walker {
                         Advance!();
                     }
                     Err(err) => match err.0 {
-                        Err::Pass(arg) => {
+                        /*Err::Pass(arg) => {
                             let tok = 'look_for_stop: loop {
                                 node_idx += 1;
                                 if node_idx >= nodes.len() {
@@ -236,10 +248,7 @@ pub mod tree_walker {
                                     break 'look_for_stop;
                                 }
                             };
-                        }
-                        Err::SubOverflow(_) => {
-                            panic!("Syntax tree is broken, could not compile");
-                        }
+                        }*/
                         Err::FileEndPeaceful => return Err((Err::FileEndPeaceful, false)),
                         _ => {
                             /*println!(
@@ -254,6 +263,7 @@ pub mod tree_walker {
                                 Error!(err.0, !$recoverable);
                             }
                             *idx = start_idx;
+                            advance_node = false;
                             if !err.1 {
                                 advance_node = true;
                             }
@@ -265,11 +275,22 @@ pub mod tree_walker {
         }
         macro_rules! Error {
             ($error: expr, $reset: expr) => {
-                //println!("Erorruju");
+                //println!("Erorruju: {:?}", $error);
                 return Err(($error, *harderr));
             };
         }
-        while node_idx < nodes.len() {
+        let endon = if let Some(arg) = params.get("endon") {
+            Some(tokenizer::parse_token(arg))
+        }else {
+            None
+        };
+        let endwith = if let Some(arg) = params.get("endwith") {
+            Some(tokenizer::parse_token(arg))
+        }else {
+            None
+        };
+        advance_tok = false;
+        'lop: while node_idx < nodes.len() {
             advance_node = true;
             advance_tok = true;
             //println!("nodes: {} idx: {node_idx}\ntokens: {} idx: {}", nodes.len(), tokens.len(), *idx);
@@ -286,7 +307,17 @@ pub mod tree_walker {
                 //println!("KONEC SOUBORU PREJ");
                 Error!(Err::FileEnd, true);
             }
-            use ast_parser::NodeType;
+            if let Some(ref endontok) = endon {
+                if tokens[*idx] == *endontok {
+                    return Ok(Some((0, ReturnActions::Chain)));
+                }
+            }
+            if let Some(ref endontok) = endwith {
+                if tokens[*idx] == *endontok {
+                    *idx += 1;
+                    return Ok(Some((0, ReturnActions::Chain)));
+                }
+            }
             match &nodes[node_idx] {
                 NodeType::Expect(node) => {
                     //println!("{:?}    {:?}", node.kind, tokens[*idx]);
@@ -335,40 +366,76 @@ pub mod tree_walker {
                     }
                 }
                 NodeType::Command(node) => {
-                    Advance!();
+                    if let Tokens::Text(str) = &node.kind {
+                        //println!("Command: {}", str);
+                        match str.as_str() {
+                            "end" => {
+                                //println!("\n\n\n\n\n\n\n\n\n\n\n");
+                                return Ok(Some((0, ReturnActions::Chain)));
+                            }
+                            _ => {}
+                        }
+                    }
                 }
                 NodeType::ArgsCondition(args_con) => {
-                    Advance!();
                     *idx -= 1;
                     let mut all_match = true;
                     for arg in &args_con.params {
+                        //println!("zkouska siren: {arg:?}");
                         match params.get(arg.0) {
                             Some(param) => {
                                 if param != arg.1 {
-                                    all_match = false;
+                                //println!("problem");
+                                all_match = false;
                                 }
                             }
                             None => {
+                                //println!("problem");
                                 all_match = false;
                             }
                         }
                     }
                     if all_match {
+                        advance_tok = false;
+                        Advance!();
                         ScopeEnter!(args_con, true);
+                        advance_tok = false;
+                        advance_node = false;
+                        Advance!();
                     }
                 }
             }
         }
-        //println!("Advancin' niece");
+        let advnc = if advance_tok {1usize} else {0};
+        if let Some(ref endontok) = endwith {
+            if tokens.len() > *idx && tokens[*idx - advnc] == *endontok {
+                //println!("tokens we ended with: {:?}", tokens[*idx]);
+                *idx += 1;
+                //println!("tokens we ended with: {:?}", tokens[*idx]);
+                return Ok(Some((0, ReturnActions::Chain)));
+            }else {
+                //println!("{:?} {:?} {:?}", params, tokens[*idx], *endontok);
+                Error!(Err::WrongEndingToken((*endontok).clone(), tokens[*idx].clone()), true);
+            }
+        }
+        if let Some(ref endontok) = endon {
+            if tokens.len() > *idx && tokens[*idx - advnc] == *endontok {
+                return Ok(Some((0, ReturnActions::Chain)));
+            }else {
+                //println!("{:?} {:?} {:?}", params, tokens[*idx], *endontok);
+                Error!(Err::WrongEndingToken((*endontok).clone(), tokens[*idx].clone()), true);
+            }
+        }
+        //println!("SsdDFWSFE");
         Ok(Some((0, ReturnActions::Advance)))
     }
-    fn set(token_found: TokenOrNode, token_expected: &Tokens, place: &mut NodeType) {
+    fn set(token_found: TokenOrNode, token_expected: &Tokens, place: &mut ArgNodeType) {
         match place {
-            NodeType::Array(arr) => match token_found {
+            ArgNodeType::Array(arr) => match token_found {
                 TokenOrNode::Node(node) => arr.push(node),
                 TokenOrNode::Token(token) => arr.push(construct_token(&token, token_expected)),
             },
-            NodeType::Value(val) => match token_found {
+            ArgNodeType::Value(val) => match token_found {
                 TokenOrNode::Node(node) => *val = node,
                 TokenOrNode::Token(token) => *val = construct_token(&token, token_expected),
             },
@@ -380,7 +447,7 @@ pub mod tree_walker {
     }
     fn construct_token(token_found: &Tokens, token_expected: &Tokens) -> Node {
         match token_expected {
-            Tokens::String(str) => Node {
+            Tokens::String(_) => Node {
                 name: token_found.clone(),
                 data: Some(token_expected.clone()),
                 nodes: HashMap::new(),
@@ -407,6 +474,18 @@ pub mod tree_walker {
                     }
                     return CompareResult::NotEq;
                 }
+                "'float" => {
+                    if let Tokens::Number(_, _, kind) = source_token {
+                        return if *kind == 'f' {CompareResult::Eq} else {CompareResult::NotEq};
+                    }
+                    return CompareResult::NotEq;
+                }
+                "'int" => {
+                    if let Tokens::Number(_, _, kind) = source_token {
+                        return if *kind == 'i' {CompareResult::Eq} else {CompareResult::NotEq};
+                    }
+                    return CompareResult::NotEq;
+                }
                 "'text" => {
                     if let Tokens::Text(_) = source_token {
                         return CompareResult::Eq;
@@ -415,6 +494,12 @@ pub mod tree_walker {
                 }
                 "'char" => {
                     if let Tokens::Char(_) = source_token {
+                        return CompareResult::Eq;
+                    }
+                    return CompareResult::NotEq;
+                }
+                "'eof" => {
+                    if let Tokens::EndOfFile = source_token {
                         return CompareResult::Eq;
                     }
                     return CompareResult::NotEq;
@@ -471,17 +556,18 @@ pub mod tree_walker {
         FileEnd,
         FileEndPeaceful,
         Pass(String),
-        SubOverflow(usize),
+        /// expected found
+        WrongEndingToken(Tokens, Tokens),
     }
     /// structures defined by user
     #[derive(Debug)]
     pub struct Node {
-        name: Tokens,
-        data: Option<Tokens>,
-        nodes: HashMap<String, NodeType>,
+        pub name: Tokens,
+        pub data: Option<Tokens>,
+        pub nodes: HashMap<String, ArgNodeType>,
     }
     #[derive(Debug)]
-    pub enum NodeType {
+    pub enum ArgNodeType {
         Array(Vec<Node>),
         Value(Node),
     }

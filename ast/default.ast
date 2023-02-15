@@ -1,247 +1,483 @@
-code_block [lines
-	{
-	} ? end="true"
-	if ? set="lines"
-	switch ? set="lines"
-	let ? set="lines"
-	const ? set="lines"
-	fun ? set="lines"
-	loop ? set="lines"
-	while ? set="lines"
-	do ? set="lines"
-	return ? set="lines" lock="lines"
-	iterable="true"
-		break ? set="lines"
-		continue ? set="lines"
-	use ? set="lines"
-	lib ? set="lines"
-	} ? stop="block" end="true"
-	value ? set="lines" back="14"
-	err !;
+"
+This is main AST
 
-_type parent [children
-	"'text" set="parent"
-	< ?
-		_type set="children"
-		, ?
-			_type set="children" back="1"
+Full documentation for this file format can be found in ast/readme
+"
+
+entry [nodes
+	KWFun ? set="nodes" back="0"
+	KWConst ? set="nodes" back="1"
+	KWStruct ? set="nodes" back="2"
+	KWType ? set="nodes" back="3"
+	KWImport ? set="nodes" back="4"
+	KWImpl ? set="nodes" back="5"
+	KWTrait ? set="nodes" back="6"
+	KWEnum ? set="nodes" back="7"
+	"'eof";
+
+
+"
+let danda: int = 50;
+let danda: int;
+let danda = 50;
+let danda;
+"
+KWLet identifier type expression
+	"let" harderr="true"
+	ident set="identifier"
+	type_specifier ? set="type"
+	= ?
+		expression set="expression"
+	;;
+
+
+"
+const DANDA: int = 50;
+"
+KWConst identifier type expression
+	"const" harderr="true"
+	ident set="identifier"
+	type_specifier set="type"
+	=
+	expression set="expression"
+	;;
+
+
+"
+: type
+usually for function arguments declaration 
+fun danda(txt: String){}
+"
+type_specifier type
+	: harderr="true"
+	type set="type";
+
+
+"
+[int; 50]
+int
+int<float<[int; 50]>>
+etc..
+"
+type main generic
+	array_decl ? set="main" end="false"
+	ident set="main"
+	generic_expr ? set="generic";
+
+
+"
+[int; 60]
+"
+array_decl type size
+	[
+	type set="type"
+	;
+	expression set="size"
+	];
+
+
+"
+type danda = int;
+"
+KWType identifier type
+	"type" harderr="true"
+	ident set="identifier"
+	=
+	type set="type"
+	;;
+
+
+"
+import ""std.time""; // imagine this with only one ("")
+import ""std.time"" as tm;
+"
+KWImport path alias
+	"import" harderr="true"
+	"'string" set="path"
+	"as" ?
+		ident set="alias"
+	;;
+
+
+"
+if true {}
+else if true {}
+else {}
+"
+KWIf expression code [elif else
+	"if" harderr="true"
+	expression set="expression"
+	code_block set="code"
+	KWElif ? back="0" set="elif"
+	KWElse ? set="else";
+
+
+"
+else if true {}
+"
+KWElif expression code
+	"else" 
+	"if" harderr="true"
+	expression set="expression"
+	code_block set="code";
+
+
+"
+else {}
+"
+KWElse code
+	"else" harderr="true"
+	code_block set="code";
+
+
+"
+while true {}
+"
+KWWhile expression code
+	"while" harderr="true"
+	expression set="expression" 
+	code_block set="code";
+
+
+"
+loop {}
+"
+KWLoop code
+	"loop" harderr="true"
+	code_block set="code";
+
+
+"
+for i in range(60) {}
+"
+KWFor idx expression code
+	"for" harderr="true"
+	ident set="idx"
+	"in"
+	expression set="expression" 
+	code_block set="code";
+
+
+"
+break;
+"
+KWBreak expression
+	"break" harderr="true"
+	;;
+
+
+"
+continue;
+"
+KWContinue
+	"continue" harderr="true"
+	;;
+
+
+"
+switch danda {
+	0 {}
+	1 {}
+	5 {}
+	_ {}
+}
+"
+KWSwitch expression [nodes
+	"switch" harderr="true"
+	expression set="expression" 
+	{
+	switch_node ? set="nodes" back="0"
+	};
+
+
+"
+0 {}
+see KWSwitch..
+"
+switch_node expression code
+	expression harderr="true" set="expression"
+	code_block set="code";
+
+
+"
+enum {
+	One,
+	Two,
+	Five = 5
+}
+"
+KWEnum identifier [values
+	"enum" harderr="true"
+	ident set="identifier"
+	{
+	enum_value ? set="values"
+	, ? back="1"
+	};
+
+
+"
+Five = 5
+Six = 6f // error expected int
+see KWEnum..
+"
+enum_value identifier default
+	ident set="identifier"
+	= ? harderr="true"
+		"'int" ? set="default" end="true"
+		"'number" err="expected int at enum variant";
+
+
+"
+struct Danda {
+	name: String,
+	age: int
+}
+"
+KWStruct identifier [keys
+	"struct" harderr="true"
+	ident set="identifier"
+	{
+	arg ? set="keys"
+	, ? back="1"
+	};
+
+
+"
+impl Danda(Rusty) {
+	fun move(self){}
+}
+"
+KWImpl target [traits [methods
+	"impl" harderr="true"
+	ident set="target"
+	; ? err="impl body not implemented"
+	( ?
+		ident set="traits"
+		, ? back="1"
+		)
+	; ? end="true"
+	{
+	KWFun ? set="methods" back="0"
+	};
+
+
+"
+trait Rusty (Danda){
+	fun print (self){
+		// i can access self.age, self.name
+	}
+}
+"
+KWTrait identifier parent [methods
+	"trait" harderr="true"
+	ident set="identifier"
+	( ?
+		ident set="parent"
+		)
+	{
+	KWFun ? set="methods" back="0"
+	};
+
+
+"
+fun parse_str<Type>(str: String): Type {}
+fun danda() {}
+fun danda(&self) {}
+fun danda(self) {}
+"
+KWFun identifier generic [arguments type code
+	"fun" harderr="true"
+	ident set="identifier"
+	generic_decl ? set="generic"
+	(
+	self_arg ? set="arguments"
+	arg ? set="arguments"
+	, ? back="1"
+	)
+	type_specifier ? set="type"
+	code_block set="code" returnable="true";
+
+self_arg args
+	& ? set="args"
+	"self" set="args";
+
+generic_decl [identifiers
+	< harderr="true"
+	generic_ident set="identifiers"
+	, ? back="1"
 	>;
 
-typed_identifier identifier type
-	"'text" set="identifier"
+generic_ident ident [traits
+	ident harderr="true"
+	( ?
+		ident ? set="traits"
+		, ? back="1"
+		);
+
+KWReturn expression
+	"yeet" harderr="true"
+	expression ? set="expression" 
+	;;
+	
+arg identifier type
+	ident set="identifier" harderr="true"
 	:
 	type set="type";
 
-index
-	[
-	value
-	];
+code_block [nodes
+	{ harderr="true"
+	KWLet ? set="nodes" back="0"
+	KWIf ? set="nodes" back="1"
+	KWFun ? set="nodes" back="2"
+	KWWhile ? set="nodes" back="3"
+	KWConst ? set="nodes" back="4"
+	KWFor ? set="nodes" back="5"
+	KWSwitch ? set="nodes" back="6"
+	KWStruct ? set="nodes" back="7"
+	KWType ? set="nodes" back="8"
+	KWImport ? set="nodes" back="9"
+	KWLoop ? set="nodes" back="10"
+	KWBreak ? set="nodes" back="11"
+	KWReturn ? set="nodes" back="12"
+	KWContinue ? set="nodes" back="13"
+	KWImpl ? set="nodes" back="14"
+	KWTrait ? set="nodes" back="15"
+	KWEnum ? set="nodes" back="16"
+	code_block ? set="nodes" back="17"
+	set ? set="nodes" back="18"
+	; ? back="19"
+	} ? end="true"
+	expression ? set="nodes" back="21";
 
-arguments [args
-	(
-	variable ? set="args"
-	, ?
-		variable set="args" back="1"
+set value operator expression
+	value set="value"
+	set_op set="operator"
+	expression set="expression"
+	;;
+
+set_op op
+	= ? set="op" end="true"
+	+= ? set="op" end="true"
+	-= ? set="op" end="true"
+	/= ? set="op" end="true"
+	*= ? set="op" end="true"
+	"'any" err="not a setting operator";
+
+expression [nodes
+	value ? set="nodes"
+	operator ? set="nodes" back="1"
+	free_parenthesis ? set="nodes" back="1";
+
+free_parenthesis parenthesis cast
+	parenthesis harderr="true" set="parenthesis"
+	cast ? set="cast";
+
+operator op
+	< ? set="op" end="true"
+	<= ? set="op" end="true"
+	>= ? set="op" end="true"
+	> ? set="op" end="true"
+	+ ? set="op" end="true"
+	- ? set="op" end="true"
+	* ? set="op" end="true"
+	/ ? set="op" end="true"
+	!= ? set="op" end="true"
+	== ? set="op" end="true"
+	| ? set="op" end="true"
+	& ? set="op" end="true"
+	"'any" err="not an operator";
+
+parenthesis [expression cast
+	( harderr="true"
+	expression ? set="expression"
+	, ? back="1"
 	);
 
-variable identifier [children
-	"'text" set="identifier"
-	arguments ? set="children" back="0"
-	index ? set="children" back="1"
-	. ?
-		variable set="children" back="3";
+value value
+	variable ? set="value" end="false"
+	literal ? set="value" end="false"
+	"'any" err="true";
 
-operator result
-	< ? set="result" end="true"
-	<= ? set="result" end="true"
-	>= ? set="result" end="true"
-	> ? set="result" end="true"
-	+ ? set="result" end="true"
-	- ? set="result" end="true"
-	* ? set="result" end="true"
-	/ ? set="result" end="true"
-	!= ? set="result" end="true"
-	== ? set="result" end="true"
-	| ? set="result" end="true"
-	& ? set="result" end="true"
-	err !;
+variable [value cast keywords
+	ref_tok ? set="value"
+	value_mod ? set="keywords" harderr="true"
+	ident set="value"
+	nested ? set="value" back="0"
+	idx ? set="value" back="1"
+	function_call ? set="value" back="2"
+	cast ? set="cast";
 
-setting_operator result
-	+= ? set="result"
-	-= ? set="result"
-	*= ? set="result"
-	/= ? set="result"
-	= ? set="result"
-	err !;
+literal value
+	"'number" ? set="value" end="true"
+	"'string" ? set="value" end="true"
+	array_expr ? set="value" end="true"
+	"'any" err="not a literal value";
 
-value [expression
-	variable ? set="expression" back="0"
-	operator ? set="expression" back="1"
-	"'number" ? set="expression" back="1";
+array_expr array
+	array_builder ? set="array" end="false"
+	array_literal ? set="array" end="false"
+	"'any" err="not an array";
 
-let identifier type val
-	"let"
-	"'text" set="identifier"
-	; ? end="true"
-	: ?
-		_type set="type"
-	; ? end="true"
-	= ?
-		value ? breakdel=";" set="value" end="true"
-		if ? return="true" set="value" break="true"
-		loop ? return="true" set="value" break="true"
-		err !
-	;;
+array_builder value size
+	[
+	expression set="value"
+	;
+	expression set="size"
+	];
 
-obj identifier type val
-	"obj"
-	"'text" set="identifier"
-	; ? end="true"
-	: ?
-		_type set="type"
-	; ? end="true"
-	= ?
-		value ? breakdel=";" set="value" end="true"
-		if ? return="true" set="value" break="true"
-		loop ? return="true" set="value" break="true"
-		err !
-	;;
+array_literal [values
+	[
+	expression ? set="values"
+	, ? back="1"
+	];
 
-const
-	"const"
-	typed_identifier
-	=
-		value
-	;;
+ref_tok [tokens
+	* ? set="tokens" back="0"
+	& ? set="tokens" back="1";
 
-type identifier type
-	"type"
-	"'text" set="identifier"
-	=
-	_type set="type";;
+generic_expr [types
+	< harderr="true"
+	type set="types"
+	, ? back="1"
+	>;
 
-switch
-	"switch"
-	value breakin="{"
-	value ? breakex="{"
-		code_block back="1"
-	"_" ? repeat="false"
-		code_block
-	};
+function_call generic parenthesis
+	generic_expr ? set="generic"
+	parenthesis set="parenthesis";
 
-if [conditions [code_blocks
-	"if"
-	value breakex="{" set="conditions"
-	code_block set="code_blocks"
-	"else" ?
-		"if" ?
-			value set="conditions"
-			code_block breakex="{" back="3" set="code_blocks"
-		code_block set="code_blocks";
 
-fun identifier [args code
-	"fun"
-	"'text" set="identifier"
-	(
-	typed_identifier ? set="args"
-		, ? back="1"
-	)
-	: ?
-		code_block return="true" end="true" set="code"
-	code_block set="code";
+nested identifier
+	. harderr="true"
+	ident set="identifier";
 
-struct identifier [keys [methods [traits
-	"struct"
-	"'text" set="identifier"
-	{
-	fun ? set="methods" back="0"
-	typed_identifier ? set="keys"
-		, ? back="2"
-	impl ?
-		"'text" set="traits" back="3"
-	};
+idx expression
+	[ harderr="true"
+	expression set="expression"
+	];
 
-trait identifier [keys [methods
-	"trait"
-	"'text" set="identifier"
-	{
-	fun ? set="methods" back="0"
-	typed_identifier ? set="keys"
-		, ? back="2"
-	};
+RESERVED
+	"const" ? end="false"
+	"let" ? end="false"
+	"if" ? end="false"
+	"while" ? end="false"
+	"fun" ? end="false"
+	"impl" ? end="false"
+	"struct" ? end="false"
+	"yeet" ? end="false"
+	"continue" ? end="false"
+	"break" ? end="false"
+	"as" ? end="false"
+	"new" ? end="false"
+	"'any" err="v poradku";
 
-enum identifier [keys
-	"enum"
-	"'text" set="identifier"
-	{
-	"'text" set="keys"
-	= ?
-		value set="keys"
-	, ? back="2"
-	};
+value_mod kw 
+	"new" ? set="kw" end="true"
+	"'any" err="neni kw";
 
-for iterator code
-	"for"
-	value set="value" breakex="{"
-	code_block set="code" iterable="true";
+cast type
+	"as" harderr="true"
+	type set="type";
 
-labeled_code label code
-	"'text" set="label"
-	code_block set="code";
-
-foreach iterator [code
-	"foreach"
-	value set="iterator" breakdel="{"
-	labeled_code ? set="code"
-		, ? back="1"
-	};
-
-loop code_block
-	"loop"
-	code_block iterable="true" set="code_block";
-
-while condition code_block
-	"while"
-	value breakex="{" set="condition"
-	code_block set="code_block" iterable="true";
-
-do condition code_block
-	"do"
-	code_block set="code_block" iterable="true"
-	"while"
-	value breakdel=";" set="condition";
-
-return value
-	"return"
-	value ? breakex=";" set="value"
-	; ?
-	pass="block";
-
-break value
-	"break"
-	value ? breakex=";" set="value"
-	; ?
-	pass="block";
-
-continue
-	"continue"
-	; ?
-	pass="block";
-
-use [path
-	"use"
-	"'text" set="path"
-	. ?
-		identifier ? set="path" back="1"
-		* ? set="path"
-	;;
-
-entry main [nodes
-	use ? set="nodes" back="0"
-	struct ? set="nodes" back="1"
-	function ? set="nodes" back="2"
-	enum ? set="nodes" back="3"
-	trait ? set="nodes" back="4"
-	const ? set="nodes" back="5"
-	"main" ?
-		function set="main" back="7";
+ident identifier
+	RESERVED ? err="identifier name is reserved"
+	"'text" set="identifier";

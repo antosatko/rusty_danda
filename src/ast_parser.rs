@@ -9,7 +9,7 @@ pub mod ast_parser {
         use std::fs;
         let source =
             fs::read_to_string(source_path).expect("Unexpected problem while opening AST file");
-        let (tokens, mut lines, mut errors) = tokenize(source, false);
+        let (tokens, mut lines, mut errors) = tokenize(&source.into(), false);
         if let Ok(mut refactored) = refactor(tokens, &mut lines, &mut errors) {
             return Some(analize_tree(&mut refactored));
         } else {
@@ -230,7 +230,9 @@ mod formater {
                                 return 1;
                             };
                             if let Tokens::Text(txt2) = &tokens[idx + 2] {
-                                if let Ok(num2) = txt2.parse::<usize>() {
+                                let mut float = String::from("0.");
+                                float.push_str(txt2);
+                                if let Ok(num2) = float.parse::<f64>() {
                                     tokens[idx] = Tokens::Number(first_num, num2, 'f');
                                     tokens.remove(idx + 1);
                                     tokens.remove(idx + 1);
@@ -251,7 +253,7 @@ mod formater {
                         } else {
                             if bytes[bytes.len() - 1].is_ascii_digit() {
                                 if let Ok(num) = txt.parse::<usize>() {
-                                    tokens[idx] = Tokens::Number(num, 0, 'i')
+                                    tokens[idx] = Tokens::Number(num, 0f64, 'i')
                                 } else {
                                     errors.push(Errors::InvalidNumber(lines[idx], txt.to_string()));
                                     // syntax err: incorrect number
@@ -259,7 +261,7 @@ mod formater {
                             } else {
                                 if let Ok(num) = txt[..txt.len() - 1].parse::<usize>() {
                                     tokens[idx] =
-                                        Tokens::Number(num, 0, bytes[bytes.len() - 1] as char)
+                                        Tokens::Number(num, 0f64, bytes[bytes.len() - 1] as char)
                                 } else {
                                     errors.push(Errors::InvalidNumber(lines[idx], txt.to_string()));
                                     // syntax err: incorrect number
@@ -275,6 +277,11 @@ mod formater {
                         return 1;
                     }
                 }
+                lines.remove(idx);
+                tokens.remove(idx);
+                return 0;
+            }
+            Tokens::Whitespace(txt) => {
                 if txt == "\t" {
                     tokens[idx] = Tokens::Tab;
                     return 1;

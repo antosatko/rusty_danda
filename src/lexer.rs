@@ -5,11 +5,12 @@ pub mod tokenizer {
     };
     const RESERVED_CHARS: &str = " +-*/=%;:,.({<[]>})&|!?\"'\\";
     pub fn tokenize(
-        file: String,
+        file: &Vec<u8>,
         format: bool,
     ) -> (Vec<Tokens>, Vec<(usize, usize)>, Vec<parse_err::Errors>) {
-        let mut tokens: Vec<Tokens> = Vec::with_capacity(file.len() / 6);
-        let mut text_pos: Vec<(usize, usize)> = Vec::with_capacity(file.len() / 6);
+        let allocation_size = (file.len() as f64 * 0.7) as usize;
+        let mut tokens: Vec<Tokens> = Vec::with_capacity(allocation_size);
+        let mut text_pos: Vec<(usize, usize)> = Vec::with_capacity(allocation_size);
         text_pos.push((0,0));
         let mut errors: Vec<parse_err::Errors> = vec![];
 
@@ -20,7 +21,7 @@ pub mod tokenizer {
                 text_pos[text_pos.len() - 1].0 + res.1,
                 text_pos[text_pos.len() - 1].1,
             ));
-            if let Tokens::Text(txt) = &res.0 {
+            if let Tokens::Whitespace(txt) = &res.0 {
                 if txt == "\n" {
                     let len = text_pos.len() - 1;
                     text_pos[len].1 += 1;
@@ -33,18 +34,18 @@ pub mod tokenizer {
         if !format {
             return (tokens, text_pos, errors);
         }
-        if let Ok(refactored) = refactor(tokens, &mut text_pos, &mut errors) {
-            return (refactored, text_pos, errors);
+        if let Ok(refactored) = refactor(tokens, text_pos, &mut errors) {
+            return (refactored.0, refactored.1, errors);
         } else {
             println!("neco se pokazilo");
             panic!();
         }
     }
-    pub fn get_token(line: &str) -> (Tokens, usize) {
+    pub fn get_token(line: &[u8]) -> (Tokens, usize) {
         let len = find_ws_str(line, &RESERVED_CHARS);
         let len = if len == 0 { 1 } else { len };
         let str = &line[0..len];
-        let token = parse_token(&str);
+        let token = parse_token(std::str::from_utf8(str).unwrap());
         return (token, str.len());
     }
     pub fn parse_token(string: &str) -> Tokens {
@@ -75,8 +76,16 @@ pub mod tokenizer {
             "[" => Tokens::SquareBracket(false),
             "]" => Tokens::SquareBracket(true),
             " " => Tokens::Space,
-            _ => Tokens::Text(string.to_string()),
+            _ => if is_whitespace(string) {Tokens::Whitespace(string.to_string())}else{Tokens::Text(string.to_string())},
         }
+    }
+    fn is_whitespace(str: &str) -> bool {
+        for char in str.chars() {
+            if !char.is_whitespace(){
+                return false
+            }
+        }
+        true
     }
     pub fn deparse_token(token: &Tokens) -> String {
         // +-*/=%;:,.({<[]>})&|!?"'\
@@ -114,26 +123,19 @@ pub mod tokenizer {
             _ => "".to_string(),
         }
     }
-    fn compare(original: &mut usize, compared: Option<usize>) {
-        if let Some(compared) = compared {
-            if compared < *original {
-                *original = compared
+    pub fn find_ws_str(expression: &[u8], tokens_str: &str) -> usize {
+        let mut idx = 0;
+
+        for char in expression {
+            if tokens_str.contains(*char as char) || (*char as char).is_whitespace() {
+                break;
             }
+            idx +=1;
         }
-    }
-    pub fn find_ws_str(expression: &str, str: &str) -> usize {
-        let idx = {
-            let mut lowest_idx = expression.len();
-            for char in str.chars() {
-                compare(&mut lowest_idx, expression.find(char));
-            }
-            compare(&mut lowest_idx, expression.find(char::is_whitespace));
-            lowest_idx
-        };
         idx
     }
     /// "+-*/=%;:,.({<[]>})&|!?\"'\\"
-    #[derive(Debug, PartialEq, Clone, Eq)]
+    #[derive(Debug, PartialEq, Clone)]
     pub enum Tokens {
         /// opening 0, closing 1
         Parenteses(bool),
@@ -154,14 +156,17 @@ pub mod tokenizer {
         Space,
         /// content
         String(String),
+        Whitespace(String),
         Char(char),
         /// in case we can not identify token at the moment
         Text(String),
         DoubleColon,
-        Number(usize, usize, char),
+        Number(usize, f64, char),
         Tab,
         Pipe,
         Ampersant,
+        Deleted,
+        EndOfFile,
     }
     #[derive(Debug, PartialEq, Clone, Copy, Eq)]
     pub enum Operators {

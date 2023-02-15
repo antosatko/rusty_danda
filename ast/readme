@@ -6,7 +6,7 @@ Syntax errors are non-existent at the moment
 so think twice before writing code. (you might
 find yourself in an infinite loop :P)
 
-Indentation is only tabs only (\t), comments are not allowed, 
+Indentation is tabs only (\t), comments are not allowed, 
 each structure must follow a set of rules:
 1. Head - defines appearence of your structure
     identifier - structures are accesible by their identifiers
@@ -35,17 +35,13 @@ Compiler specific Element arguments:
     end ('any) - structure returns its current state
     set (<target>) - head parameter is set/pushed elements return value
     back (unsigned integer) - code cursor is sent back
-    lock (<target>) - prevents set argument from executing on target
-    unlock (<target>) - allows for set argument to execute on target
-    repeat (unsigned integer) - prevents element from repeating itself more than specified
     print (text) - prints to the terminal
-    debug (<target>) - prints value/s on target parameter
     err (message) - returns error message if node does not fail
-    pass (<identifier>) - returns and forces prev. node to look for first token with stop="<identifier>"
-    stop (<identifier>) - sets stop for pass argument
     peek ('any) - token idx wont move forward
     harderr (bool) - true: any error occuring from now on carries to the prev structure
     advance (usize) - advances token idx
+    debug ('any) - prints current token
+    data ('identifier) - prints own data
 To create own arguments just pass them to the structure 
 
 
