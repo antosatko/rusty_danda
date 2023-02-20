@@ -513,7 +513,6 @@ RESERVED
 
 value_mod kw 
 	"new" ? set="kw" end="true"
-	"delete" ? set="kw" end="true"
 	"'any" err="neni kw";
 
 cast type
