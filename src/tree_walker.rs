@@ -160,7 +160,7 @@ pub mod tree_walker {
                     if let TokenOrNode::Node(ref nodede) = $token {
                         if let Some(ArgNodeType::Array(arr)) = nodede.nodes.get(arg) {
                             if arr.len() == 0 {
-                                Error!(Err::Expected($node.clone(), tokens[*idx].clone()), true);
+                                Error!(Err::ExpectedOneOf(extract_tokens_range(&nodes, (maybes_start(&nodes, node_idx - 1), maybes_end(&nodes, node_idx))), tokens[*idx].clone()), true);
                             }
                         }
                     }
@@ -186,7 +186,10 @@ pub mod tree_walker {
                     Error!(Err::Pass(arg.into()), false);
                 }
                 if let Some(arg) = $args.get("err") {
-                    Error!(Err::Msg(arg.into()), false);
+                    if arg.len() > 0 {
+                        Error!(Err::Msg(arg.into()), false);
+                    }
+                    Error!($node);
                 }
             };
         }
@@ -278,6 +281,12 @@ pub mod tree_walker {
                 //println!("Erorruju: {:?}", $error);
                 return Err(($error, *harderr));
             };
+            ($node: expr) => {
+                if node_idx == 0 {
+                    Error!(Err::Expected($node.clone(), tokens[*idx].clone()), true);
+                }
+                Error!(Err::ExpectedOneOf(extract_tokens_range(&nodes, (maybes_start(&nodes, node_idx - 1), maybes_end(&nodes, node_idx))), tokens[*idx].clone()), true);
+            }
         }
         let endon = if let Some(arg) = params.get("endon") {
             Some(tokenizer::parse_token(arg))
@@ -290,10 +299,10 @@ pub mod tree_walker {
             None
         };
         advance_tok = false;
-        'lop: while node_idx < nodes.len() {
+        while node_idx < nodes.len() {
             advance_node = true;
             advance_tok = true;
-            //println!("nodes: {} idx: {node_idx}\ntokens: {} idx: {}", nodes.len(), tokens.len(), *idx);
+            //println!("nodes: {:?} idx: {node_idx}\ntokens: {:?} idx: {}", nodes[node_idx], tokens[*idx], *idx);
             if *idx >= tokens.len() {
                 if maybes_end(nodes, node_idx) == nodes.len() {
                     //println!("Advancin'");
@@ -333,7 +342,7 @@ pub mod tree_walker {
                         }
                         CompareResult::NotEq => {
                             // err
-                            Error!(Err::Expected(node.kind.clone(), tokens[*idx].clone()), true);
+                            Error!(node.kind);
                         }
                         CompareResult::Ident(ident) => {
                             OpenStruct!(ident, &node, false);
@@ -373,9 +382,28 @@ pub mod tree_walker {
                                 //println!("\n\n\n\n\n\n\n\n\n\n\n");
                                 return Ok(Some((0, ReturnActions::Chain)));
                             }
+                            "notempty" => {
+                                match node.arguments.get("nodes") {
+                                    Some(args) => {
+                                        for arg in args.split(" "){
+                                            if let Some(ArgNodeType::Array(arr)) = data.get(arg) {
+                                                if arr.len() == 0 {
+                                                    *harderr = true;
+                                                    Error!(node.kind);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    None => {
+                                        panic!("parameter doesnt exist.");
+                                    }
+                                } 
+                            }
                             _ => {}
                         }
                     }
+                    advance_tok = false;
+                    Advance!();
                 }
                 NodeType::ArgsCondition(args_con) => {
                     *idx -= 1;
@@ -492,12 +520,12 @@ pub mod tree_walker {
                     }
                     return CompareResult::NotEq;
                 }
-                "'char" => {
+                /*"'char" => {
                     if let Tokens::Char(_) = source_token {
                         return CompareResult::Eq;
                     }
                     return CompareResult::NotEq;
-                }
+                }*/
                 "'eof" => {
                     if let Tokens::EndOfFile = source_token {
                         return CompareResult::Eq;
@@ -534,7 +562,36 @@ pub mod tree_walker {
                 break;
             }
         }
-        return idx;
+        idx
+    }
+    fn maybes_start(syntax: &Vec<ast_parser::NodeType>, mut idx: usize) -> usize {
+        while let ast_parser::NodeType::Maybe(_) = syntax[idx] {
+            if idx == 0 {
+                break;
+            }
+            idx -= 1;
+        }
+        match syntax[idx] {
+            NodeType::Expect(_) => idx,
+            NodeType::Maybe(_) => idx,
+            _=> idx + 1
+        }
+    }
+    fn extract_tokens_range(syntax: &Vec<ast_parser::NodeType>, range: (usize, usize)) -> Vec<Tokens> {
+        let mut result = Vec::new();
+        for idx in range.0..range.1 {
+            match &syntax[idx] {
+                NodeType::Expect(tok) => {
+                    result.push(tok.kind.clone());
+                }
+                NodeType::Maybe(tok) => {
+                    result.push(tok.kind.clone());
+                }
+                _ => {
+                }
+            }
+        }
+        result
     }
     #[derive(PartialEq)]
     enum ReturnActions {
@@ -552,12 +609,14 @@ pub mod tree_walker {
     #[derive(Debug)]
     pub enum Err {
         Expected(Tokens, Tokens),
+        ExpectedOneOf(Vec<Tokens>, Tokens),
         Msg(String),
         FileEnd,
         FileEndPeaceful,
         Pass(String),
         /// expected found
         WrongEndingToken(Tokens, Tokens),
+        EmptyNodeParameter(String),
     }
     /// structures defined by user
     #[derive(Debug)]

@@ -1,7 +1,7 @@
 pub mod tokenizer {
-    use crate::token_refactor::{
+    use crate::lexing_preprocessor::{
         parse_err::{self},
-        refactorer::refactor,
+        lexing_preprocessor::refactor,
     };
     const RESERVED_CHARS: &str = " +-*/=%;:,.({<[]>})&|!?\"'\\";
     pub fn tokenize(
@@ -51,10 +51,10 @@ pub mod tokenizer {
     pub fn parse_token(string: &str) -> Tokens {
         // +-*/=%;:,.({<[]>})&|!?"'\
         match string {
-            "+" => Tokens::Operator(Operators::Add),
-            "-" => Tokens::Operator(Operators::Sub),
-            "*" => Tokens::Operator(Operators::Mul),
-            "/" => Tokens::Operator(Operators::Div),
+            "+" => Tokens::Operator(Operators::Plus),
+            "-" => Tokens::Operator(Operators::Minus),
+            "*" => Tokens::Operator(Operators::Star),
+            "/" => Tokens::Operator(Operators::Slash),
             "=" => Tokens::Operator(Operators::Equal),
             "%" => Tokens::Operator(Operators::Mod),
             "&" => Tokens::Ampersant,
@@ -90,10 +90,10 @@ pub mod tokenizer {
     pub fn deparse_token(token: &Tokens) -> String {
         // +-*/=%;:,.({<[]>})&|!?"'\
         match token {
-            Tokens::Operator(Operators::Add) => "+".to_string(),
-            Tokens::Operator(Operators::Sub) => "-".to_string(),
-            Tokens::Operator(Operators::Mul) => "*".to_string(),
-            Tokens::Operator(Operators::Div) => "/".to_string(),
+            Tokens::Operator(Operators::Plus) => "+".to_string(),
+            Tokens::Operator(Operators::Minus) => "-".to_string(),
+            Tokens::Operator(Operators::Star) => "*".to_string(),
+            Tokens::Operator(Operators::Slash) => "/".to_string(),
             Tokens::Operator(Operators::Equal) => "=".to_string(),
             Tokens::Operator(Operators::Mod) => "%".to_string(),
             Tokens::Operator(Operators::And) => "&&".to_string(),
@@ -157,7 +157,6 @@ pub mod tokenizer {
         /// content
         String(String),
         Whitespace(String),
-        Char(char),
         /// in case we can not identify token at the moment
         Text(String),
         DoubleColon,
@@ -170,10 +169,10 @@ pub mod tokenizer {
     }
     #[derive(Debug, PartialEq, Clone, Copy, Eq)]
     pub enum Operators {
-        Add,
-        Sub,
-        Mul,
-        Div,
+        Plus,
+        Minus,
+        Star,
+        Slash,
         Mod,
         AddEq,
         SubEq,

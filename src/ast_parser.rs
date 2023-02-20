@@ -165,7 +165,7 @@ pub mod ast_parser {
 mod formater {
     use crate::{
         lexer::tokenizer::{/*Keywords,*/ deparse_token, Operators, Tokens},
-        token_refactor::{parse_err::Errors, refactorer::LexingErr},
+        lexing_preprocessor::{parse_err::Errors, lexing_preprocessor::LexingErr},
     };
 
     pub fn refactor(
@@ -290,29 +290,43 @@ mod formater {
                 tokens.remove(idx);
                 return 0;
             }
+            Tokens::Pipe => {
+                if let Tokens::Pipe = tokens[idx + 1] {
+                    tokens[idx] = Tokens::Operator(Operators::Or);
+                    tokens.remove(idx + 1);
+                    lines.remove(idx + 1);
+                }
+            }
+            Tokens::Ampersant => {
+                if let Tokens::Ampersant = tokens[idx + 1] {
+                    tokens[idx] = Tokens::Operator(Operators::And);
+                    tokens.remove(idx + 1);
+                    lines.remove(idx + 1);
+                }
+            }
             Tokens::Operator(op) => match op {
-                Operators::Add => {
+                Operators::Plus => {
                     if let Tokens::Operator(Operators::Equal) = tokens[idx + 1] {
                         tokens[idx] = Tokens::Operator(Operators::AddEq);
                         tokens.remove(idx + 1);
                         lines.remove(idx + 1);
                     }
                 }
-                Operators::Sub => {
+                Operators::Minus => {
                     if let Tokens::Operator(Operators::Equal) = tokens[idx + 1] {
                         tokens[idx] = Tokens::Operator(Operators::SubEq);
                         tokens.remove(idx + 1);
                         lines.remove(idx + 1);
                     }
                 }
-                Operators::Mul => {
+                Operators::Star => {
                     if let Tokens::Operator(Operators::Equal) = tokens[idx + 1] {
                         tokens[idx] = Tokens::Operator(Operators::MulEq);
                         tokens.remove(idx + 1);
                         lines.remove(idx + 1);
                     }
                 }
-                Operators::Div => {
+                Operators::Slash => {
                     if let Tokens::Operator(Operators::Equal) = tokens[idx + 1] {
                         tokens[idx] = Tokens::Operator(Operators::DivEq);
                         tokens.remove(idx + 1);

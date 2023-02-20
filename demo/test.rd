@@ -14,19 +14,20 @@ struct Ball {
 }
 
 impl Ball {
-    fun constructor(){
+    fun constructor(direction: float){
         self.x = S_WIDTH as float / 2f;
         self.y = S_HEIGHT as float / 2f;
         self.r = 5f;
-        self.xs = 1f;
+        self.xs = direction;
         self.ys = 0f;
     }
-    fun move(self) {
+    fun move(&self) {
         self.x += self.xs;
         self.y += self.ys;
     }
-    fun draw(self) {
-        // neco
+    fun draw(&self, ctx: &win.Window) {
+        ctx.fillColor(win.Colors.White);
+        ctx.fillCircle(self.x, self.y, self.r)
     }
 }
 
@@ -53,7 +54,7 @@ impl Player {
         self.points = 0;
         self.side = side;
     }
-    fun move(self, direction: float) {
+    fun move(&self, direction: float) {
         self.y += self.speed * direction;
         if self.y < 0 {
             self.y = 0;
@@ -61,16 +62,64 @@ impl Player {
         else if self.y > S_HEIGHT - self.h {
             self.y = S_HEIGHT - self.h;
         }
-        if self.x < 0 {
-            self.x = 0;
-        }
-        if self.x > S_HEIGHT - self.h {
-            self.x = S_HEIGHT - self.h;
+    }
+    fun collision(&self, ball: &Ball) {
+        if self.side as int < ball.x + ball.r / 2 && self.side as int + self.w > ball.x - ball.r / 2 &&
+            self.y < ball.y + ball.r / 2 && self.y + self.h > ball.y - ball.r / 2 
+        {
+            // collision detected
+            // too lazy to do something rn
+            ball.xs *= -1f;
         }
     }
+    fun draw(&self, ctx: &win.Window) {
+        ctx.fillColor(win.Colors.White);
+        ctx.fillRect(self.Sides as float, self.y, self.w, self.h)
+    }
+}
+
+fun draw(p1: &Player, p2: &Player, ball: &Ball, ctx: &win.Window){
+    ball.draw();
+    p0.draw();
+    p1.draw();
+    // kdybych nebyl liny tak bych ted vykreslil skore atd..
 }
 
 fun main(){
     let ctx = win.init();
-    sdfa("dgfg", 60 + 8) as integer + (60f) as float - [60 + 3; 60];
+    ctx.title("myGame");
+    let players = [Player(Sides.Left), Player(Sides.Right)];
+    let ball = Ball(1f);
+    let running = true;
+    let gameRunning = true;
+    while running {
+        for e in ctx.get_events() {
+            switch e.type {
+            win.EventType.Close {
+                running = false;
+            },
+            win.EventType.KeyDown {
+                if e.key == win.Keys.S {
+                    players[0].move(1f)
+                }
+                else if e.key == win.Keys.W {
+                    players[0].move(-1f)
+                }
+                else if e.key == win.Keys.ArrowDown {
+                    players[1].move(1f)
+                }
+                else if e.key == win.Keys.ArrowUp {
+                    players[1].move(-1f)
+                }
+            }
+            }
+        }
+        // Game logic
+        if gameRunning {
+            draw(&players[0], &players[1], &ball, &ctx);
+        }
+        if players[0].points == 10 || players[1].points == 10 {
+            gameRunning = false;
+        }
+    }
 }
